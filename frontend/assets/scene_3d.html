@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: radial-gradient(circle at 50% 20%, #0f1c38 0%, #070b14 70%, #04060c 100%);
+  }
+  canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+  }
+</style>
+</head>
+<body>
+<canvas id="scene3d"></canvas>
+<script>
+const canvas = document.getElementById("scene3d");
+const ctx = canvas.getContext("2d");
+
+let width, height;
+let mouseX = 0, mouseY = 0;
+let targetRotX = 0.22, targetRotY = 0;
+let rotX = 0.22, rotY = 0;
+
+function resize() {
+  width = canvas.width = window.innerWidth;
+  height = canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
+
+// Écoute le mouvement de la souris aussi sur la fenêtre parente si accessible
+window.addEventListener("mousemove", (e) => {
+  mouseX = (e.clientX / width - 0.5) * 2;
+  mouseY = (e.clientY / height - 0.5) * 2;
+});
+try {
+  window.parent.document.addEventListener("mousemove", (e) => {
+    mouseX = (e.clientX / window.parent.innerWidth - 0.5) * 2;
+    mouseY = (e.clientY / window.parent.innerHeight - 0.5) * 2;
+  });
+} catch (err) {}
+
+// Projection 3D -> 2D
+function project3D(x, y, z) {
+  // Rotation Y
+  const cosY = Math.cos(rotY);
+  const sinY = Math.sin(rotY);
+  let x1 = x * cosY - z * sinY;
+  let z1 = z * cosY + x * sinY;
+
+  // Rotation X
+  const cosX = Math.cos(rotX);
+  const sinX = Math.sin(rotX);
+  let y1 = y * cosX - z1 * sinX;
+  let z2 = z1 * cosX + y * sinX;
+
+  const fov = 560;
+  const distance = 620 + z2;
+  const scale = fov / Math.max(80, distance);
+
+  return {
+    x: width * 0.5 + x1 * scale,
+    y: height * 0.52 + y1 * scale,
+    scale: scale,
+    z: z2
+  };
+}
+
+// Nœuds représentant des opportunités / signaux de matching en 3D
+const nodes = Array.from({ length: 42 }, (_, i) => {
+  const angle = (i / 42) * Math.PI * 2;
+  const radius = 150 + (i % 5) * 65;
+  return {
+    baseAngle: angle,
+    radius: radius,
+    yOffset: ((i % 7) - 3) * 42,
+    speed: 0.0035 + (i % 4) * 0.0012,
+    size: 2.5 + (i % 3) * 1.4,
+    accent: i % 5 === 0
+  };
+});
+
+let tick = 0;
+
+function drawGrid3D() {
+  const gridSize = 900;
+  const step = 90;
+  const floorY = 150;
+
+  ctx.lineWidth = 1;
+
+  for (let x = -gridSize; x <= gridSize; x += step) {
+    const p1 = project3D(x, floorY, -gridSize);
+    const p2 = project3D(x, floorY, gridSize);
+    ctx.strokeStyle = "rgba(56, 189, 248, 0.11)";
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+  }
+
+  for (let z = -gridSize; z <= gridSize; z += step) {
+    const p1 = project3D(-gridSize, floorY, z);
+    const p2 = project3D(gridSize, floorY, z);
+    ctx.strokeStyle = "rgba(129, 140, 248, 0.10)";
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+  }
+}
+
+function drawRadarRings() {
+  const rings = [140, 240, 340];
+  rings.forEach((r, idx) => {
+    const segments = 64;
+    ctx.beginPath();
+    for (let i = 0; i <= segments; i++) {
+      const a = (i / segments) * Math.PI * 2 + tick * (0.004 * (idx % 2 === 0 ? 1 : -1));
+      const p = project3D(Math.cos(a) * r, -20 + Math.sin(a * 2 + tick * 0.02) * 12, Math.sin(a) * r);
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    }
+    ctx.strokeStyle = idx === 1 ? "rgba(56, 189, 248, 0.26)" : "rgba(99, 102, 241, 0.16)";
+    ctx.lineWidth = idx === 1 ? 1.5 : 1;
+    ctx.stroke();
+  });
+}
+
+function drawNodesAndLinks() {
+  const projected = nodes.map((n) => {
+    const a = n.baseAngle + tick * n.speed;
+    const x = Math.cos(a) * n.radius;
+    const z = Math.sin(a) * n.radius;
+    const y = n.yOffset + Math.sin(tick * 0.02 + n.baseAngle * 3) * 16;
+    return { ...project3D(x, y, z), node: n };
+  });
+
+  // Liens entre nœuds proches en 3D
+  for (let i = 0; i < projected.length; i++) {
+    for (let j = i + 1; j < projected.length; j++) {
+      const dx = projected[i].x - projected[j].x;
+      const dy = projected[i].y - projected[j].y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 115) {
+        const alpha = (1 - dist / 115) * 0.18;
+        ctx.strokeStyle = `rgba(56, 189, 248, ${alpha.toFixed(3)})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(projected[i].x, projected[i].y);
+        ctx.lineTo(projected[j].x, projected[j].y);
+        ctx.stroke();
+      }
+    }
+  }
+
+  // Rendu des nœuds triés par profondeur
+  projected.sort((a, b) => b.z - a.z);
+  projected.forEach((p) => {
+    const r = Math.max(1.5, p.node.size * p.scale);
+    const glow = p.node.accent ? "rgba(52, 211, 153, 0.85)" : "rgba(56, 189, 248, 0.8)";
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function animate() {
+  tick += 1;
+  targetRotY = mouseX * 0.45 + Math.sin(tick * 0.004) * 0.18;
+  targetRotX = 0.22 + mouseY * 0.22;
+
+  rotX += (targetRotX - rotX) * 0.06;
+  rotY += (targetRotY - rotY) * 0.06;
+
+  ctx.clearRect(0, 0, width, height);
+
+  // Dégradé d'ambiance
+  const grad = ctx.createRadialGradient(width * 0.5, height * 0.35, 30, width * 0.5, height * 0.5, Math.max(width, height) * 0.75);
+  grad.addColorStop(0, "rgba(15, 28, 56, 0.92)");
+  grad.addColorStop(0.65, "rgba(7, 11, 20, 0.96)");
+  grad.addColorStop(1, "rgba(4, 6, 12, 1)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, width, height);
+
+  drawGrid3D();
+  drawRadarRings();
+  drawNodesAndLinks();
+
+  requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+</body>
+</html>

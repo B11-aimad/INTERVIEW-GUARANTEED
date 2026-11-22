@@ -1,17 +1,43 @@
 import os
+from pathlib import Path
 import requests
 import streamlit as st
+import streamlit.components.v1 as components
 
 st.set_page_config(
-    page_title="Entretien Garanti — Accueil",
+    page_title="Entretien Garanti — Pilotage Intelligent des Offres",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 API_URL = os.getenv("API_BASE_URL", "http://backend:8000")
+ASSETS_DIR = Path(__file__).parent / "assets"
 
-# Initialisation de l'état de session
+
+def load_css(file_path: Path) -> None:
+    if file_path.exists():
+        css = file_path.read_text(encoding="utf-8")
+        st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+
+
+def mount_3d_background(file_path: Path) -> None:
+    if file_path.exists():
+        html = file_path.read_text(encoding="utf-8")
+        # Injection en fond plein écran via position fixe
+        wrapped_html = f"""
+        <div style="position: fixed; inset: 0; z-index: -1; pointer-events: none;">
+            {html}
+        </div>
+        """
+        components.html(wrapped_html, height=0, width=0)
+
+
+# Chargement séparé du style et de la scène 3D
+load_css(ASSETS_DIR / "styles.css")
+mount_3d_background(ASSETS_DIR / "scene_3d.html")
+
+# État initial de session
 if "agent_state" not in st.session_state:
     st.session_state.agent_state = "ACTIF"
 if "current_plan" not in st.session_state:
@@ -20,11 +46,11 @@ if "quota_used" not in st.session_state:
     st.session_state.quota_used = (0, 5)
 
 # ==============================================================================
-# BARRE LATÉRALE : NAVIGATION & ÉTAT SYSTÈME
+# BARRE LATÉRALE : NAVIGATION & ÉTAT DU SYSTÈME
 # ==============================================================================
 with st.sidebar:
-    st.title("🎯 Entretien Garanti")
-    st.caption("Agent IA supervisé de candidature")
+    st.markdown("### 🎯 Entretien Garanti")
+    st.caption("Centre de pilotage d'offres & candidatures")
     st.divider()
 
     page = st.radio(
@@ -59,15 +85,26 @@ if page == "🏠 Accueil (Home)":
             "Conformément à la règle d'arrêt, l'agent IA est verrouillé à l'état ARRETE."
         )
 
-    st.title("Bienvenue sur Entretien Garanti")
     st.markdown(
-        "Plateforme intelligente d'aide à la recherche d'emploi fondée sur une approche "
-        "**Human-in-the-Loop** : l'IA structure votre CV, sélectionne les offres les plus "
-        "pertinentes via un **score explicable** et prépare vos lettres sans inventer "
-        "d'expérience, tandis que **vous gardez le contrôle à chaque étape**."
+        '<div class="hero-badge">⚡ CENTRE DE PILOTAGE IA • HUMAN-IN-THE-LOOP</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="hero-title">Pilotez vos offres et candidatures avec précision</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="hero-subtitle">'
+        "Explorez les opportunités pertinentes, visualisez l'adéquation réelle avec votre profil "
+        "et préparez des candidatures fidèles à votre parcours — avec validation humaine à chaque "
+        "étape et arrêt automatique dès l'obtention d'un entretien."
+        "</div>",
+        unsafe_allow_html=True,
     )
 
-    # Indicateurs clés du candidat
+    st.write("")
+
+    # Indicateurs clés
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("État de l'Agent IA", st.session_state.agent_state)
@@ -79,64 +116,58 @@ if page == "🏠 Accueil (Home)":
     with col4:
         st.metric("Règle d'arrêt", "Auto sur Entretien")
 
-    st.divider()
+    st.write("")
+    st.markdown("#### Parcours guidé en 4 étapes")
 
-    # Parcours en 4 étapes
-    st.subheader("Parcours d'accompagnement en 4 étapes")
     c1, c2, c3, c4 = st.columns(4)
+    steps = [
+        (c1, "ÉTAPE 01", "Compte & Conformité", "Authentification JWT, consentement explicite (Loi 09-08 / RGPD) et choix de formule."),
+        (c2, "ÉTAPE 02", "Import & Validation CV", "Extraction automatique (PDF/DOCX) de vos compétences et expériences, validée par vous."),
+        (c3, "ÉTAPE 03", "Matching Explicable", "Score transparent (45 % sémantique, 35 % compétences, 20 % préférences) détaillé."),
+        (c4, "ÉTAPE 04", "Lettre & Règle d'arrêt", "Rédaction fidèle au CV, relecture humaine et arrêt dès le 1er entretien."),
+    ]
+    for col, num, title, desc in steps:
+        with col:
+            st.markdown(
+                f"""
+                <div class="glass-card">
+                    <div class="step-num">{num}</div>
+                    <div class="card-title">{title}</div>
+                    <div class="card-text">{desc}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-    with c1:
-        st.info(
-            "**1. Compte & Conformité**\n\n"
-            "Authentification sécurisée (JWT), consentement explicite (Loi 09-08 / RGPD) "
-            "et choix de votre formule."
-        )
-    with c2:
-        st.info(
-            "**2. Import & Validation CV**\n\n"
-            "Extraction NLP depuis PDF/DOCX (compétences, expériences, diplômes) "
-            "avec validation humaine obligatoire."
-        )
-    with c3:
-        st.info(
-            "**3. Matching Explicable**\n\n"
-            "Score transparent (**45 %** sémantique, **35 %** compétences, **20 %** préférences) "
-            "avec détails des critères."
-        )
-    with c4:
-        st.info(
-            "**4. Lettre & Règle d'arrêt**\n\n"
-            "Génération fidèle au CV, relecture avant envoi, et arrêt automatique "
-            "dès l'obtention d'un entretien."
-        )
+    st.write("")
+    st.markdown("#### Formules d'accompagnement")
 
-    st.divider()
-
-    # Comparatif des 3 formules
-    st.subheader("Formules d'abonnement (Simulation académique)")
     f1, f2, f3 = st.columns(3)
-
-    with f1:
-        with st.container(border=True):
-            st.markdown("### 🌱 Découverte")
-            st.write("• Jusqu'à **5 candidatures**")
-            st.write("• Jusqu'à **5 générations IA**")
-            st.write("• Matching explicable & suivi des statuts")
-
-    with f2:
-        with st.container(border=True):
-            st.markdown("### 🚀 Accélérateur")
-            st.write("• Jusqu'à **25 candidatures**")
-            st.write("• Jusqu'à **30 générations IA**")
-            st.write("• Priorisation des offres & relances")
-
-    with f3:
-        with st.container(border=True):
-            st.markdown("### 🏆 Garanti")
-            st.write("• **Candidatures illimitées**")
-            st.write("• **Générations IA illimitées**")
-            st.write("• Accompagnement jusqu'au **1er entretien**")
+    plans = [
+        (f1, "🌱 Découverte", "5 candidatures", "• Jusqu'à 5 candidatures<br>• Jusqu'à 5 générations IA<br>• Matching explicable & suivi"),
+        (f2, "🚀 Accélérateur", "25 candidatures", "• Jusqu'à 25 candidatures<br>• Jusqu'à 30 générations IA<br>• Priorisation des offres"),
+        (f3, "🏆 Garanti", "Illimité", "• Candidatures illimitées<br>• Générations IA illimitées<br>• Accompagnement jusqu'au 1er entretien"),
+    ]
+    for col, name, quota, bullets in plans:
+        with col:
+            st.markdown(
+                f"""
+                <div class="glass-card">
+                    <div class="card-title">{name}</div>
+                    <div class="plan-price">{quota}</div>
+                    <div class="card-text">{bullets}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
 else:
-    st.title(page)
-    st.info("Module en cours de développement — disponible à la prochaine étape.")
+    st.markdown(
+        f"""
+        <div class="glass-card">
+            <div class="card-title">{page}</div>
+            <div class="card-text">Module prêt à être branché sur l'API FastAPI à la prochaine étape.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
