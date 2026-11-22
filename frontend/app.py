@@ -24,13 +24,31 @@ def load_css(file_path: Path) -> None:
 def mount_3d_background(file_path: Path) -> None:
     if file_path.exists():
         html = file_path.read_text(encoding="utf-8")
-        # Injection en fond plein écran via position fixe
-        wrapped_html = f"""
-        <div style="position: fixed; inset: 0; z-index: -1; pointer-events: none;">
-            {html}
-        </div>
-        """
-        components.html(wrapped_html, height=0, width=0)
+        # Force l'iframe généré par Streamlit en arrière-plan plein écran
+        st.markdown(
+            """
+            <style>
+            iframe[title="streamlit.components.v1.html"] {
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                z-index: 0 !important;
+                pointer-events: none !important;
+                border: none !important;
+            }
+            .stApp > header,
+            [data-testid="stAppViewContainer"],
+            [data-testid="stSidebar"] {
+                position: relative;
+                z-index: 1;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+        components.html(html, height=1, width=1)
 
 
 # Chargement séparé du style et de la scène 3D
