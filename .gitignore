@@ -9,18 +9,3 @@ node_modules/
 .next/
 .DS_Store
 
-
-
-INTERVIEW-GUARANTEED/
-├── backend/
-│   ├── app/
-│   │   └── main.py
-│   ├── Dockerfile
-│   └── requirements.txt
-├── frontend/
-│   ├── app.py
-│   ├── Dockerfile
-│   └── requirements.txt
-├── .env.example
-├── .env
-└── docker-compose.yml
