@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8" /></head>
+<body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function mountThreeBackground() {
+  const parentDoc = window.parent.document;
+  const existing = parentDoc.getElementById("eg-three-canvas");
+  if (existing) return;
+
+  const canvas = parentDoc.createElement("canvas");
+  canvas.id = "eg-three-canvas";
+  Object.assign(canvas.style, {
+    position: "fixed",
+    top: "0",
+    left: "0",
+    width: "100vw",
+    height: "100vh",
+    zIndex: "0",
+    pointerEvents: "none",
+    display: "block"
+  });
+  parentDoc.body.prepend(canvas);
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x040507, 0.032);
+
+  const camera = new THREE.PerspectiveCamera(60, window.parent.innerWidth / window.parent.innerHeight, 0.1, 1000);
+  camera.position.set(0, 2.2, 11);
+
+  const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+  renderer.setSize(window.parent.innerWidth, window.parent.innerHeight);
+  renderer.setPixelRatio(Math.min(window.parent.devicePixelRatio || 1, 2));
+  renderer.setClearColor(0x040507, 1);
+
+  // Grille 3D architecturale façon 1337
+  const grid = new THREE.GridHelper(60, 48, 0x00ff66, 0x111827);
+  grid.position.y = -3.2;
+  grid.material.opacity = 0.28;
+  grid.material.transparent = true;
+  scene.add(grid);
+
+  // Noyau 3D : Icosaèdre filaire + sphère interne représentant le moteur de matching
+  const coreGroup = new THREE.Group();
+  coreGroup.position.set(3.4, 0.4, -1.5);
+  scene.add(coreGroup);
+
+  const outerGeo = new THREE.IcosahedronGeometry(2.6, 1);
+  const outerMat = new THREE.MeshBasicMaterial({
+    color: 0x00ff66,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.26
+  });
+  const outerMesh = new THREE.Mesh(outerGeo, outerMat);
+  coreGroup.add(outerMesh);
+
+  const innerGeo = new THREE.OctahedronGeometry(1.35, 0);
+  const innerMat = new THREE.MeshBasicMaterial({
+    color: 0x38bdf8,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.35
+  });
+  const innerMesh = new THREE.Mesh(innerGeo, innerMat);
+  coreGroup.add(innerMesh);
+
+  // Nuage de particules (flux d'offres)
+  const count = 260;
+  const positions = new Float32Array(count * 3);
+  for (let i = 0; i < count * 3; i += 3) {
+    positions[i] = (Math.random() - 0.5) * 32;
+    positions[i + 1] = (Math.random() - 0.5) * 16;
+    positions[i + 2] = (Math.random() - 0.5) * 24;
+  }
+  const pGeo = new THREE.BufferGeometry();
+  pGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  const pMat = new THREE.PointsMaterial({
+    color: 0x00ff66,
+    size: 0.08,
+    transparent: true,
+    opacity: 0.65
+  });
+  const particles = new THREE.Points(pGeo, pMat);
+  scene.add(particles);
+
+  let mouseX = 0, mouseY = 0;
+  parentDoc.addEventListener("mousemove", (e) => {
+    mouseX = (e.clientX / window.parent.innerWidth - 0.5) * 2;
+    mouseY = (e.clientY / window.parent.innerHeight - 0.5) * 2;
+  });
+
+  window.parent.addEventListener("resize", () => {
+    camera.aspect = window.parent.innerWidth / window.parent.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.parent.innerWidth, window.parent.innerHeight);
+  });
+
+  const clock = new THREE.Clock();
+  function animate() {
+    requestAnimationFrame(animate);
+    const t = clock.getElapsedTime();
+
+    outerMesh.rotation.y = t * 0.22;
+    outerMesh.rotation.x = t * 0.11;
+    innerMesh.rotation.y = -t * 0.45;
+    innerMesh.rotation.z = t * 0.3;
+
+    particles.rotation.y = t * 0.03;
+    grid.position.z = (t * 0.8) % 1.25;
+
+    camera.position.x += (mouseX * 1.4 - camera.position.x) * 0.04;
+    camera.position.y += (2.2 - mouseY * 0.8 - camera.position.y) * 0.04;
+    camera.lookAt(0, 0, 0);
+
+    renderer.render(scene, camera);
+  }
+  animate();
+})();
+</script>
+</body>
+</html>
