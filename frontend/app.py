@@ -2,36 +2,28 @@ import os
 from pathlib import Path
 import requests
 import streamlit as st
-import streamlit.components.v1 as components
 
 st.set_page_config(
-    page_title="Entretien Garanti",
+    page_title="GARANT.AI — Analyse CV & Matching Explicable",
     layout="wide",
-    initial_sidebar_state="expanded",
 )
 
 API_URL = os.getenv("API_BASE_URL", "http://backend:8000")
-ASSETS_DIR = Path(__file__).parent / "assets"
-CSS_PATH = ASSETS_DIR / "styles.css"
-MOTION_PATH = ASSETS_DIR / "ambient_motion.html"
+CSS_PATH = Path(__file__).parent / "assets" / "styles.css"
 
 if CSS_PATH.exists():
     st.markdown(f"<style>{CSS_PATH.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
 
-if MOTION_PATH.exists():
-    components.html(MOTION_PATH.read_text(encoding="utf-8"), height=0, width=0)
-
-# État initial de session
 if "agent_state" not in st.session_state:
     st.session_state.agent_state = "ACTIF"
 if "current_plan" not in st.session_state:
     st.session_state.current_plan = "Découverte"
 if "quota_used" not in st.session_state:
     st.session_state.quota_used = (0, 5)
-if "compact_sidebar" not in st.session_state:
-    st.session_state.compact_sidebar = False
-if "user_email" not in st.session_state:
-    st.session_state.user_email = None
+if "show_cv_text" not in st.session_state:
+    st.session_state.show_cv_text = False
+if "cv_payload" not in st.session_state:
+    st.session_state.cv_payload = None
 
 
 def api_is_online() -> bool:
@@ -41,145 +33,164 @@ def api_is_online() -> bool:
         return False
 
 
-online = api_is_online()
+_ = api_is_online()
 
-# ==============================================================================
-# SIDEBAR CLAIRE AVEC OPTION COMPACT / DÉTAILLÉ
-# ==============================================================================
-with st.sidebar:
-    st.markdown("## Entretien Garanti")
-    if not st.session_state.compact_sidebar:
-        st.caption("Agent IA supervisé • Human-in-the-Loop")
-
-    btn_txt = "Afficher détails" if st.session_state.compact_sidebar else "Mode compact"
-    if st.button(btn_txt, use_container_width=True):
-        st.session_state.compact_sidebar = not st.session_state.compact_sidebar
-        st.rerun()
-
-    st.divider()
-
-    page = st.radio(
-        "Navigation",
-        [
-            "Accueil (Home)",
-            "Compte & Consentement",
-            "Mon CV & Profil",
-            "Offres recommandées",
-            "Mes candidatures",
-        ],
-    )
-
-    if not st.session_state.compact_sidebar:
-        st.divider()
-        compte_lbl = st.session_state.user_email or "Invité"
-        st.caption(f"Compte : {compte_lbl}")
-        st.caption("Conformité : Loi 09-08 & RGPD")
-        st.caption("Backend : FastAPI • PostgreSQL 16")
-
-# ==============================================================================
-# BARRE SUPÉRIEURE FIXE LORS DU SCROLL
-# ==============================================================================
-api_badge_cls = "eg-badge-ok" if online else "eg-badge-err"
-api_badge_txt = "API Connectée" if online else "API Hors ligne"
-agent_badge_cls = "eg-badge-ok" if st.session_state.agent_state == "ACTIF" else "eg-badge-info"
-
+# 1. Menu unique fixe en haut : logo à gauche, liens centrés
 st.markdown(
-    f"""
-    <div class="eg-topbar">
-        <div class="eg-topbar-title">{page}</div>
-        <div>
-            <span class="eg-badge {agent_badge_cls}">Agent : {st.session_state.agent_state}</span>
-            <span class="eg-badge {api_badge_cls}">{api_badge_txt}</span>
-        </div>
-    </div>
+    """
+    <div id="top"></div>
+    <header class="eg-fixed-header">
+        <a href="#top" class="eg-logo">GARANT<span>.AI</span></a>
+        <nav class="eg-menu-links">
+            <a href="#upload-cv">Upload CV</a>
+            <a href="#matching">Matching 45/35/20</a>
+            <a href="#formules">Formules</a>
+            <a href="#footer-desc">À propos</a>
+        </nav>
+        <div class="eg-header-spacer"></div>
+    </header>
+    <div class="eg-top-spacer"></div>
     """,
     unsafe_allow_html=True,
 )
 
-# ==============================================================================
-# VUE PRINCIPALE : ACCUEIL (HOME)
-# ==============================================================================
-if page == "Accueil (Home)":
-    if st.session_state.agent_state == "ARRETE":
-        st.success(
-            "Entretien obtenu — Candidatures arrêtées. "
-            "Conformément à la règle d'arrêt, l'agent IA est verrouillé sur l'état ARRETE."
+_, main_col, _ = st.columns([0.2, 9.6, 0.2])
+
+with main_col:
+    # 2. Section Hero centrée + bouton renvoyant vers la section d'upload CV
+    with st.container(border=True):
+        st.markdown(
+            """
+            <div class="eg-hero-box">
+                <h1 class="eg-hero-title">
+                    Optimisez votre CV pour un <span class="eg-hero-mark">matching exact</span>
+                </h1>
+                <p class="eg-hero-sub">
+                    GARANT.AI structure votre profil avec validation humaine obligatoire, calcule un score
+                    explicable (45% sémantique, 35% compétences, 20% préférences), génère des lettres
+                    fidèles à votre CV sans hallucination et arrête automatiquement l'agent dès
+                    l'obtention d'un entretien.
+                </p>
+                <a href="#upload-cv" class="eg-hero-cta">Importer mon CV</a>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
+        p1, p2, p3, p4, p5 = st.columns(5)
+        p1.markdown('<div class="eg-step-pill"><strong>Matching 45/35/20</strong><br><small>Score explicable</small></div>', unsafe_allow_html=True)
+        p2.markdown('<div class="eg-step-pill"><strong>Validation Humaine</strong><br><small>Human-in-the-Loop</small></div>', unsafe_allow_html=True)
+        p3.markdown('<div class="eg-step-pill"><strong>Sans Hallucination</strong><br><small>Fidèle au CV</small></div>', unsafe_allow_html=True)
+        p4.markdown('<div class="eg-step-pill"><strong>Règle d\'Arrêt</strong><br><small>ACTIF / ARRETE</small></div>', unsafe_allow_html=True)
+        p5.markdown('<div class="eg-step-pill"><strong>Loi 09-08 & RGPD</strong><br><small>Consentement & oubli</small></div>', unsafe_allow_html=True)
+
+    # 3. Section Upload CV centrée en bas du Hero
+    st.markdown('<div id="upload-cv"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="eg-center-heading">1. Importer votre CV</div>', unsafe_allow_html=True)
+
+    with st.container(border=True):
+        s1, s2, s3 = st.columns(3)
+        s1.markdown('<div class="eg-step-pill"><strong>1. Importer le CV</strong><br><small>PDF, DOCX ou texte brut</small></div>', unsafe_allow_html=True)
+        s2.markdown('<div class="eg-step-pill"><strong>2. Validation humaine</strong><br><small>Profil vérifié avant génération IA</small></div>', unsafe_allow_html=True)
+        s3.markdown('<div class="eg-step-pill"><strong>3. Matching & Candidature</strong><br><small>Score 45/35/20 et arrêt auto</small></div>', unsafe_allow_html=True)
+
+        cv_file = st.file_uploader(
+            "Déposez ou sélectionnez votre CV (PDF ou DOCX)",
+            type=["pdf", "docx"],
+        )
+
+        b_col1, _ = st.columns([1.4, 3.6])
+        with b_col1:
+            if st.button("Coller le texte du CV", use_container_width=True):
+                st.session_state.show_cv_text = not st.session_state.show_cv_text
+                st.rerun()
+
+        cv_text = ""
+        if st.session_state.show_cv_text:
+            cv_text = st.text_area(
+                "Texte du CV",
+                height=130,
+                placeholder="Collez ici vos compétences, expériences, formations et préférences...",
+            )
+
+        if cv_file is not None:
+            st.success(f"Fichier sélectionné : {cv_file.name} ({cv_file.size} octets)")
+
+        if st.button("Préparer / Analyser le CV", type="primary", use_container_width=True):
+            if st.session_state.agent_state == "ARRETE":
+                st.warning("L'agent est à l'état ARRETE suite à l'obtention d'un entretien.")
+            elif cv_file is None and not cv_text.strip():
+                st.info("Veuillez importer un fichier PDF/DOCX ou coller le texte de votre CV.")
+            else:
+                st.session_state.cv_payload = {
+                    "filename": cv_file.name if cv_file else "texte_colle.txt",
+                    "size_bytes": cv_file.size if cv_file else len(cv_text.encode("utf-8")),
+                    "has_text": bool(cv_text.strip()),
+                    "human_validated": False,
+                }
+                st.success(
+                    f"CV préparé ({st.session_state.cv_payload['filename']}) — "
+                    "Prêt pour l'envoi vers l'endpoint backend de parsing et validation humaine."
+                )
+
+    # Matching explicable (45 / 35 / 20)
+    st.markdown('<div id="matching"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="eg-center-heading">Pondération du matching explicable</div>', unsafe_allow_html=True)
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Similarité sémantique", "45 %")
+    m2.metric("Compétences", "35 %")
+    m3.metric("Préférences", "20 %")
+    m4.metric("État de l'agent", st.session_state.agent_state)
+
+    # Formules
+    st.markdown('<div id="formules"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="eg-center-heading">Formules</div>', unsafe_allow_html=True)
+
+    used, total = st.session_state.quota_used
+    f1, f2, f3 = st.columns(3)
+    with f1:
+        with st.container(border=True):
+            st.markdown("### Découverte")
+            st.write("5 candidatures • 5 générations IA")
+            if st.button("Choisir Découverte", use_container_width=True):
+                st.session_state.current_plan = "Découverte"
+                st.session_state.quota_used = (used, 5)
+                st.rerun()
+    with f2:
+        with st.container(border=True):
+            st.markdown("### Accélérateur")
+            st.write("25 candidatures • 30 générations IA")
+            if st.button("Choisir Accélérateur", use_container_width=True):
+                st.session_state.current_plan = "Accélérateur"
+                st.session_state.quota_used = (used, 25)
+                st.rerun()
+    with f3:
+        with st.container(border=True):
+            st.markdown("### Garanti")
+            st.write("Candidatures et générations IA illimitées")
+            if st.button("Choisir Garanti", use_container_width=True):
+                st.session_state.current_plan = "Garanti"
+                st.session_state.quota_used = (used, "Illimité")
+                st.rerun()
+
+    # 4. Footer descriptif
+    st.markdown('<div id="footer-desc"></div>', unsafe_allow_html=True)
+    st.divider()
     st.markdown(
-        """
-        <div class="eg-hero">
-            <div class="eg-kicker">Human-in-the-Loop • Pilotage intelligent des candidatures</div>
-            <h1>Pilotez vos candidatures, décrochez <span>votre entretien.</span></h1>
-            <p>
-                Extraction structurée de votre CV, score de matching explicable
-                (<strong>45% sémantique • 35% compétences • 20% préférences</strong>),
-                génération de lettres fidèles à votre profil sans hallucination et arrêt automatique
-                dès l'obtention d'un entretien.
+        f"""
+        <div class="eg-footer-box">
+            <div class="eg-logo">GARANT<span>.AI</span></div>
+            <p class="eg-footer-text" style="margin-top: 8px; margin-bottom: 10px;">
+                GARANT.AI est une plateforme intelligente de gestion de recherche d'emploi et de candidatures
+                fondée sur une approche Human-in-the-Loop. Elle analyse et structure le CV, calcule un score
+                de matching explicable (45% sémantique, 35% compétences, 20% préférences), génère des lettres
+                fidèles au parcours sans hallucination et arrête automatiquement l'agent dès l'obtention d'un entretien.
             </p>
+            <small>
+                Conformité Loi 09-08 &amp; RGPD • Formule active : {st.session_state.current_plan} • Quotas : {used}/{total}
+            </small>
         </div>
         """,
         unsafe_allow_html=True,
     )
-
-    used, total = st.session_state.quota_used
-    m1, m2, m3, m4 = st.columns(4)
-    with m1:
-        with st.container(border=True):
-            st.metric("État de l'Agent IA", st.session_state.agent_state)
-    with m2:
-        with st.container(border=True):
-            st.metric("Formule active", st.session_state.current_plan)
-    with m3:
-        with st.container(border=True):
-            st.metric("Quotas candidatures", f"{used} / {total}")
-    with m4:
-        with st.container(border=True):
-            st.metric("Règle d'arrêt", "Auto sur Entretien")
-
-    st.subheader("Parcours en 4 étapes")
-    s1, s2, s3, s4 = st.columns(4)
-    steps = [
-        (s1, "Étape 01", "Compte & Conformité", "Authentification sécurisée, consentement explicite (Loi 09-08 / RGPD) et choix de formule."),
-        (s2, "Étape 02", "Import & Validation CV", "Extraction PDF/DOCX des compétences, expériences et diplômes avec validation humaine."),
-        (s3, "Étape 03", "Matching Explicable", "Score transparent (45% sémantique, 35% compétences, 20% préférences) détaillé."),
-        (s4, "Étape 04", "Lettre & Règle d'arrêt", "Lettre fidèle au CV, relecture avant envoi et arrêt auto dès le 1er entretien."),
-    ]
-    for col, tag, title, desc in steps:
-        with col:
-            with st.container(border=True):
-                st.caption(tag)
-                st.markdown(f"**{title}**")
-                st.write(desc)
-
-    st.subheader("Formules d'abonnement")
-    p1, p2, p3 = st.columns(3)
-    with p1:
-        with st.container(border=True):
-            st.caption("FORMULE 01")
-            st.markdown("### Découverte")
-            st.markdown("**Jusqu'à 5 candidatures**")
-            st.write("• Jusqu'à 5 candidatures")
-            st.write("• Jusqu'à 5 générations IA")
-            st.write("• Matching explicable & suivi")
-    with p2:
-        with st.container(border=True):
-            st.caption("FORMULE 02")
-            st.markdown("### Accélérateur")
-            st.markdown("**Jusqu'à 25 candidatures**")
-            st.write("• Jusqu'à 25 candidatures")
-            st.write("• Jusqu'à 30 générations IA")
-            st.write("• Priorisation des offres")
-    with p3:
-        with st.container(border=True):
-            st.caption("FORMULE 03 • RECOMMANDÉE")
-            st.markdown("### Garanti")
-            st.markdown("**Candidatures illimitées**")
-            st.write("• Candidatures illimitées")
-            st.write("• Générations IA illimitées")
-            st.write("• Accompagnement jusqu'au 1er entretien")
-
-else:
-    with st.container(border=True):
-        st.subheader(page)
-        st.info("Module prêt — prochainement connecté à PostgreSQL 16 et FastAPI.")
