@@ -116,3 +116,55 @@ def delete_my_account(token: str) -> tuple[bool, str]:
         return False, str(detail)
     except requests.RequestException as exc:
         return False, f"Erreur réseau : {exc}"
+def get_my_profile(token: str) -> tuple[bool, dict | None, str]:
+    try:
+        resp = requests.get(f"{API_BASE_URL}/profile/me", headers=_auth_headers(token), timeout=10)
+        if resp.status_code == 200:
+            return True, resp.json(), "OK"
+        detail = resp.json().get("detail", "Impossible de charger le profil.")
+        return False, None, str(detail)
+    except requests.RequestException as exc:
+        return False, None, f"Erreur réseau : {exc}"
+
+
+def update_my_profile(token: str, payload: dict) -> tuple[bool, dict | None, str]:
+    try:
+        resp = requests.put(
+            f"{API_BASE_URL}/profile/me",
+            json=payload,
+            headers=_auth_headers(token),
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            return True, resp.json(), "Profil enregistré."
+        detail = resp.json().get("detail", "Erreur lors de l'enregistrement du profil.")
+        return False, None, str(detail)
+    except requests.RequestException as exc:
+        return False, None, f"Erreur réseau : {exc}"
+
+
+def validate_my_profile(token: str, is_validated: bool = True) -> tuple[bool, dict | None, str]:
+    try:
+        resp = requests.post(
+            f"{API_BASE_URL}/profile/me/validate",
+            json={"is_validated": is_validated},
+            headers=_auth_headers(token),
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            return True, resp.json(), "Validation du profil mise à jour."
+        detail = resp.json().get("detail", "Erreur lors de la validation du profil.")
+        return False, None, str(detail)
+    except requests.RequestException as exc:
+        return False, None, f"Erreur réseau : {exc}"
+
+
+def delete_my_profile(token: str) -> tuple[bool, str]:
+    try:
+        resp = requests.delete(f"{API_BASE_URL}/profile/me", headers=_auth_headers(token), timeout=10)
+        if resp.status_code == 200:
+            return True, "Profil réinitialisé."
+        detail = resp.json().get("detail", "Impossible de supprimer le profil.")
+        return False, str(detail)
+    except requests.RequestException as exc:
+        return False, f"Erreur réseau : {exc}"
