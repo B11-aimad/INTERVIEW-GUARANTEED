@@ -43,7 +43,7 @@ st.markdown(
         <a href="#top" class="eg-logo">GARANT<span>.AI</span></a>
         <nav class="eg-menu-links">
             <a href="#upload-cv">Upload CV</a>
-            <a href="#matching">Matching 45/35/20</a>
+            <a href="#matching">Matching </a>
             <a href="#formules">Formules</a>
             <a href="#footer-desc">À propos</a>
         </nav>
