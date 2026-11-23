@@ -78,3 +78,20 @@ class Subscription(Base):
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
 
     user = relationship("User", back_populates="subscription")
+class CandidateProfile(Base):
+    __tablename__ = "candidate_profiles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
+    headline = Column(String(200), nullable=True)
+    summary = Column(Text, nullable=True)
+    skills = Column(JSON, default=list, nullable=False)
+    experiences = Column(JSON, default=list, nullable=False)
+    educations = Column(JSON, default=list, nullable=False)
+    languages = Column(JSON, default=list, nullable=False)
+    preferences = Column(JSON, default=dict, nullable=False)
+    is_validated = Column(Boolean, default=False, nullable=False)
+    validated_at = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+    user = relationship("User", back_populates="profile")
