@@ -9,3 +9,33 @@ node_modules/
 .next/
 .DS_Store
 
+# Session locale temporaire du frontend
+frontend/.active_session.json
+*.active_session.json
+
+# Fichiers CV temporaires ou de test (données personnelles sensibles)
+uploads/
+*.pdf
+*.docx
+!tests/**/*.pdf
+!tests/**/*.docx
+
+# Python / caches / environnements
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Volumes / données locales
+pgdata/
+postgres_data/
+*.sqlite
+*.sqlite3
