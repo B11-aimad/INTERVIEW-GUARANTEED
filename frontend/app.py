@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import streamlit as st
 
@@ -11,16 +12,42 @@ st.set_page_config(
     layout="wide",
 )
 
-CSS_PATH = Path(__file__).parent / "assets" / "styles.css"
+BASE_DIR = Path(__file__).parent
+CSS_PATH = BASE_DIR / "assets" / "styles.css"
+SESSION_FILE = BASE_DIR / ".active_session.json"
+
 if CSS_PATH.exists():
     st.markdown(f"<style>{CSS_PATH.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
+
+
+def _read_persisted_token() -> str | None:
+    try:
+        if SESSION_FILE.exists():
+            data = json.loads(SESSION_FILE.read_text(encoding="utf-8"))
+            tok = data.get("jwt_token")
+            if isinstance(tok, str) and tok.strip():
+                return tok.strip()
+    except Exception:
+        pass
+    return None
+
+
+def _write_persisted_token(token: str | None):
+    try:
+        if token:
+            SESSION_FILE.write_text(json.dumps({"jwt_token": token}), encoding="utf-8")
+        elif SESSION_FILE.exists():
+            SESSION_FILE.unlink()
+    except Exception:
+        pass
+
 
 if "active_view" not in st.session_state:
     st.session_state.active_view = "home"
 if "auth_redirect_after" not in st.session_state:
     st.session_state.auth_redirect_after = "home"
 if "jwt_token" not in st.session_state:
-    st.session_state.jwt_token = None
+    st.session_state.jwt_token = _read_persisted_token()
 if "profile_menu_open" not in st.session_state:
     st.session_state.profile_menu_open = False
 if "dashboard_tab_hint" not in st.session_state:
@@ -32,20 +59,17 @@ if "show_cv_text" not in st.session_state:
 if "cv_payload" not in st.session_state:
     st.session_state.cv_payload = None
 
-# Restaure le token depuis l'URL si la session Streamlit est rechargée
-url_token = st.query_params.get("token")
-if not st.session_state.jwt_token and url_token:
-    st.session_state.jwt_token = url_token
+if not st.session_state.jwt_token:
+    persisted = _read_persisted_token()
+    if persisted:
+        st.session_state.jwt_token = persisted
 
 _ = check_health()
 
 
 def set_token(token: str | None):
     st.session_state.jwt_token = token
-    if token:
-        st.query_params["token"] = token
-    else:
-        st.query_params.pop("token", None)
+    _write_persisted_token(token)
 
 
 def logout_user():
@@ -54,10 +78,9 @@ def logout_user():
     st.session_state.active_view = "auth"
 
 
-# Actions via query params en conservant ?token=... quand connecté
 nav_param = st.query_params.get("go")
 if nav_param:
-    st.query_params.pop("go", None)
+    st.query_params.clear()
     if nav_param == "home":
         st.session_state.profile_menu_open = False
         st.session_state.active_view = "home"
@@ -73,12 +96,6 @@ if nav_param:
         st.session_state.dashboard_tab_hint = "account"
         if st.session_state.jwt_token:
             st.session_state.active_view = "dashboard"
-        else:
-            st.session_state.auth_redirect_after = "dashboard"
-            st.session_state.active_view = "auth"
-    elif nav_param == "toggle_profile_menu":
-        if st.session_state.jwt_token:
-            st.session_state.profile_menu_open = not st.session_state.profile_menu_open
         else:
             st.session_state.auth_redirect_after = "dashboard"
             st.session_state.active_view = "auth"
@@ -107,12 +124,33 @@ right_actions_html = (
             </svg>
             <span>Dashboard</span>
         </a>
-        <a href="?go=toggle_profile_menu" target="_self" class="eg-profile-icon-btn" title="Profil &amp; Session">
-            <svg class="eg-nav-icon" viewBox="0 0 24 24">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                <circle cx="12" cy="7" r="4"/>
-            </svg>
-        </a>
+        <div class="eg-profile-hover-wrap">
+            <a href="?go=view_profile" target="_self" class="eg-profile-icon-btn" title="Profil &amp; Session">
+                <svg class="eg-nav-icon" viewBox="0 0 24 24">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                </svg>
+            </a>
+            <div class="eg-floating-profile-bar">
+                <div class="eg-floating-profile-bar-inner">
+                    <a href="?go=view_profile" target="_self" class="eg-floating-item profile">
+                        <svg class="eg-nav-icon" viewBox="0 0 24 24">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                            <circle cx="12" cy="7" r="4"/>
+                        </svg>
+                        <span>Consulter profil</span>
+                    </a>
+                    <a href="?go=logout" target="_self" class="eg-floating-item logout">
+                        <svg class="eg-nav-icon" viewBox="0 0 24 24">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                            <polyline points="16 17 21 12 16 7"/>
+                            <line x1="21" y1="12" x2="9" y2="12"/>
+                        </svg>
+                        <span>Logout</span>
+                    </a>
+                </div>
+            </div>
+        </div>
     </div>
     """
     if is_logged_in
@@ -131,31 +169,6 @@ right_actions_html = (
     """
 )
 
-floating_bar_html = (
-    """
-    <div class="eg-floating-profile-bar">
-        <a href="?go=view_profile" target="_self" class="eg-floating-item profile">
-            <svg class="eg-nav-icon" viewBox="0 0 24 24">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                <circle cx="12" cy="7" r="4"/>
-            </svg>
-            <span>Consulter profil</span>
-        </a>
-        <a href="?go=logout" target="_self" class="eg-floating-item logout">
-            <svg class="eg-nav-icon" viewBox="0 0 24 24">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                <polyline points="16 17 21 12 16 7"/>
-                <line x1="21" y1="12" x2="9" y2="12"/>
-            </svg>
-            <span>Logout</span>
-        </a>
-    </div>
-    """
-    if (is_logged_in and st.session_state.profile_menu_open)
-    else ""
-)
-
-# Menu unique fixe en haut
 st.markdown(
     f"""
     <div id="top"></div>
@@ -187,7 +200,6 @@ st.markdown(
         </nav>
         {right_actions_html}
     </header>
-    {floating_bar_html}
     <div class="eg-top-spacer"></div>
     """,
     unsafe_allow_html=True,
