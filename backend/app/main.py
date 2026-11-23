@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app import models  # noqa: F401
 from app.config import settings
 from app.database import Base, engine, get_db
-from app.routers import auth
+from app.routers import auth,profile
 
 
 @asynccontextmanager
@@ -27,7 +27,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
-
+app.include_router(profile.router)
 
 @app.get("/health", tags=["Santé"])
 def health_check(db: Session = Depends(get_db)):
