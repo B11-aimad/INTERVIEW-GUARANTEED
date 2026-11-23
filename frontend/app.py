@@ -1,16 +1,23 @@
 import os
 from pathlib import Path
-import requests
 import streamlit as st
+
+from services.api_client import (
+    check_health,
+    delete_my_account,
+    get_me,
+    login_user,
+    register_user,
+    update_me,
+    update_my_subscription,
+)
 
 st.set_page_config(
     page_title="GARANT.AI — Analyse CV & Matching",
     layout="wide",
 )
 
-API_URL = os.getenv("API_BASE_URL", "http://backend:8000")
 CSS_PATH = Path(__file__).parent / "assets" / "styles.css"
-
 if CSS_PATH.exists():
     st.markdown(f"<style>{CSS_PATH.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
 
@@ -27,31 +34,21 @@ if "show_cv_text" not in st.session_state:
 if "cv_payload" not in st.session_state:
     st.session_state.cv_payload = None
 
+_ = check_health()
 
-def api_is_online() -> bool:
-    try:
-        return requests.get(f"{API_URL}/health", timeout=1.5).status_code == 200
-    except Exception:
-        return False
-
-
-_ = api_is_online()
-
-# Redirection vers l'accueil ou l'authentification (Dashboard / Upload CV)
 nav_param = st.query_params.get("go")
 if nav_param == "auth_upload":
     st.session_state.auth_redirect_after = "home"
-    st.session_state.active_view = "auth"
+    st.session_state.active_view = "auth" if not st.session_state.jwt_token else "home"
     st.query_params.clear()
 elif nav_param == "auth_dashboard":
     st.session_state.auth_redirect_after = "dashboard"
-    st.session_state.active_view = "auth"
+    st.session_state.active_view = "auth" if not st.session_state.jwt_token else "dashboard"
     st.query_params.clear()
 elif nav_param == "home":
     st.session_state.active_view = "home"
     st.query_params.clear()
 
-# 1. Menu unique fixe en haut : logo à gauche, Home / Upload CV / À propos centrés + icônes, Dashboard bleu à droite
 st.markdown(
     """
     <div id="top"></div>
@@ -114,24 +111,20 @@ def render_auth_view():
                         if not email.strip() or not password:
                             st.error("Veuillez saisir votre email et votre mot de passe.")
                         else:
-                            try:
-                                resp = requests.post(
-                                    f"{API_URL}/auth/login",
-                                    json={"email": email.strip(), "password": password},
-                                    timeout=5,
-                                )
-                                resp.raise_for_status()
-                                st.session_state.jwt_token = resp.json().get("access_token", "token_ok")
-                            except Exception:
-                                st.session_state.jwt_token = "session_active"
-                            st.session_state.active_view = st.session_state.auth_redirect_after
-                            st.rerun()
+                            ok, token, msg = login_user(email, password)
+                            if ok and token:
+                                st.session_state.jwt_token = token
+                                st.session_state.active_view = st.session_state.auth_redirect_after
+                                st.rerun()
+                            else:
+                                st.error(msg)
 
             with tab_register:
                 with st.form("register_form"):
                     full_name = st.text_input("Nom complet")
                     email = st.text_input("Adresse email")
                     password = st.text_input("Mot de passe (8 caractères min.)", type="password")
+                    plan = st.selectbox("Formule", ["Découverte", "Accélérateur", "Garanti"])
                     consent_ok = st.checkbox("J'accepte le traitement de mes données personnelles.")
                     submitted = st.form_submit_button("Créer mon compte", type="primary", use_container_width=True)
                     if submitted:
@@ -140,27 +133,17 @@ def render_auth_view():
                         elif not consent_ok:
                             st.error("Veuillez cocher l'acceptation du traitement des données.")
                         else:
-                            try:
-                                resp = requests.post(
-                                    f"{API_URL}/auth/register",
-                                    json={
-                                        "full_name": full_name.strip(),
-                                        "email": email.strip(),
-                                        "password": password,
-                                        "consent": {
-                                            "law_09_08_accepted": True,
-                                            "gdpr_accepted": True,
-                                            "ai_processing_accepted": True,
-                                        },
-                                    },
-                                    timeout=5,
-                                )
-                                resp.raise_for_status()
-                            except Exception:
-                                pass
-                            st.session_state.jwt_token = "session_active"
-                            st.session_state.active_view = st.session_state.auth_redirect_after
-                            st.rerun()
+                            reg_ok, reg_msg = register_user(full_name, email, password, plan)
+                            if not reg_ok:
+                                st.error(reg_msg)
+                            else:
+                                login_ok, token, login_msg = login_user(email, password)
+                                if login_ok and token:
+                                    st.session_state.jwt_token = token
+                                    st.session_state.active_view = st.session_state.auth_redirect_after
+                                    st.rerun()
+                                else:
+                                    st.warning(f"{reg_msg} Veuillez vous connecter. ({login_msg})")
 
             if st.button("Retour à l'accueil", use_container_width=True):
                 st.session_state.active_view = "home"
@@ -169,14 +152,33 @@ def render_auth_view():
 
 def render_dashboard_view():
     st.markdown('<div class="eg-center-heading">Dashboard Candidat</div>', unsafe_allow_html=True)
-    _, dash_col, _ = st.columns([1.2, 7.6, 1.2])
 
+    token = st.session_state.jwt_token
+    if not token:
+        st.session_state.active_view = "auth"
+        st.rerun()
+        return
+
+    ok, user_data, msg = get_me(token)
+    if not ok or not user_data:
+        st.warning(msg)
+        st.session_state.jwt_token = None
+        st.session_state.active_view = "auth"
+        st.rerun()
+        return
+
+    st.session_state.agent_state = user_data.get("agent_status", "ACTIF")
+    sub = user_data.get("subscription") or {}
+
+    _, dash_col, _ = st.columns([1.2, 7.6, 1.2])
     with dash_col:
         with st.container(border=True):
-            st.markdown("### Espace Candidat")
-            st.write(f"**État de l'agent :** {st.session_state.agent_state}")
-            if st.session_state.cv_payload:
-                st.write(f"**Dernier CV préparé :** {st.session_state.cv_payload['filename']}")
+            st.markdown(f"### {user_data['full_name']}")
+            st.write(f"**Email :** {user_data['email']}")
+            st.write(f"**État de l'agent :** {user_data['agent_status']}")
+            st.write(f"**Formule active :** {sub.get('plan', 'Découverte')}")
+            st.write(f"**Candidatures :** {sub.get('applications_used', 0)} / {sub.get('max_applications') or 'Illimité'}")
+            st.write(f"**Générations IA :** {sub.get('ai_generations_used', 0)} / {sub.get('max_ai_generations') or 'Illimité'}")
 
             c1, c2 = st.columns(2)
             with c1:
@@ -189,12 +191,47 @@ def render_dashboard_view():
                     st.session_state.active_view = "auth"
                     st.rerun()
 
+            st.divider()
+            st.markdown("#### Modifier le compte")
+            with st.form("update_user_form"):
+                upd_name = st.text_input("Nom complet", value=user_data["full_name"])
+                upd_email = st.text_input("Adresse email", value=user_data["email"])
+                upd_password = st.text_input("Nouveau mot de passe (optionnel)", type="password")
+                if st.form_submit_button("Enregistrer les modifications", type="primary", use_container_width=True):
+                    u_ok, _, u_msg = update_me(token, full_name=upd_name, email=upd_email, password=upd_password or None)
+                    if u_ok:
+                        st.success(u_msg)
+                        st.rerun()
+                    else:
+                        st.error(u_msg)
+
+            plans = ["Découverte", "Accélérateur", "Garanti"]
+            current_plan = sub.get("plan", "Découverte")
+            idx = plans.index(current_plan) if current_plan in plans else 0
+            chosen_plan = st.selectbox("Formule", plans, index=idx)
+            if st.button("Mettre à jour la formule", use_container_width=True):
+                s_ok, _, s_msg = update_my_subscription(token, chosen_plan)
+                if s_ok:
+                    st.success(s_msg)
+                    st.rerun()
+                else:
+                    st.error(s_msg)
+
+            with st.expander("Supprimer mon compte"):
+                if st.button("Confirmer la suppression définitive", use_container_width=True):
+                    d_ok, d_msg = delete_my_account(token)
+                    if d_ok:
+                        st.session_state.jwt_token = None
+                        st.session_state.active_view = "home"
+                        st.rerun()
+                    else:
+                        st.error(d_msg)
+
 
 def render_home_view():
     _, main_col, _ = st.columns([0.2, 9.6, 0.2])
 
     with main_col:
-        # Section Hero centrée + bouton renvoyant vers l'authentification
         with st.container(border=True):
             st.markdown(
                 """
@@ -219,7 +256,6 @@ def render_home_view():
             p3.markdown('<div class="eg-step-pill"><strong>Lettres Fidèles</strong><br><small>Sans hallucination</small></div>', unsafe_allow_html=True)
             p4.markdown('<div class="eg-step-pill"><strong>Règle d\'Arrêt</strong><br><small>ACTIF / ARRETE</small></div>', unsafe_allow_html=True)
 
-        # Section Upload CV modernisée
         st.markdown('<div id="upload-cv"></div>', unsafe_allow_html=True)
         st.markdown('<div class="eg-center-heading">1. Importer votre CV</div>', unsafe_allow_html=True)
 
@@ -260,7 +296,6 @@ def render_home_view():
                     label_visibility="collapsed",
                 )
 
-            # Deux boutons alignés verticalement, avec le second élargi en bleu et texte blanc
             _, act_col, _ = st.columns([2.2, 5.6, 2.2])
             with act_col:
                 if st.button("Ou coller le texte du CV", type="secondary", use_container_width=True):
@@ -301,7 +336,6 @@ def render_home_view():
                         "Prêt pour l'envoi vers le backend."
                     )
 
-        # Footer descriptif
         st.markdown('<div id="footer-desc"></div>', unsafe_allow_html=True)
         st.divider()
         st.markdown(
