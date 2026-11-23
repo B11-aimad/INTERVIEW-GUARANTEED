@@ -83,3 +83,64 @@ class UserProfileResponse(BaseModel):
 class ErasureResponse(BaseModel):
     message: str
     deleted_user_id: int
+class ExperienceItem(BaseModel):
+    role: str = Field(..., min_length=1, max_length=200)
+    company: str = Field(..., min_length=1, max_length=200)
+    start_date: str | None = Field(default=None, max_length=50)
+    end_date: str | None = Field(default=None, max_length=50)
+    description: str | None = Field(default=None, max_length=2000)
+
+
+class EducationItem(BaseModel):
+    degree: str = Field(..., min_length=1, max_length=200)
+    institution: str = Field(..., min_length=1, max_length=200)
+    year: str | None = Field(default=None, max_length=50)
+
+
+class LanguageItem(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    level: str | None = Field(default=None, max_length=100)
+
+
+class PreferencesInput(BaseModel):
+    target_role: str | None = Field(default=None, max_length=200)
+    city: str | None = Field(default=None, max_length=150)
+    contract_type: str | None = Field(default=None, max_length=100)
+    remote_allowed: bool = Field(default=False)
+
+
+class CandidateProfileUpdateRequest(BaseModel):
+    headline: str | None = Field(default=None, max_length=200)
+    summary: str | None = Field(default=None, max_length=4000)
+    skills: list[str] | None = None
+    experiences: list[ExperienceItem] | None = None
+    educations: list[EducationItem] | None = None
+    languages: list[LanguageItem] | None = None
+    preferences: PreferencesInput | None = None
+    is_validated: bool | None = None
+
+
+class CandidateProfileValidateRequest(BaseModel):
+    is_validated: bool = Field(default=True)
+
+
+class CandidateProfileResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int
+    headline: str | None = None
+    summary: str | None = None
+    skills: list[str]
+    experiences: list[dict[str, Any]]
+    educations: list[dict[str, Any]]
+    languages: list[dict[str, Any]]
+    preferences: dict[str, Any]
+    is_validated: bool
+    validated_at: datetime | None = None
+    updated_at: datetime
+
+
+class ProfileDeleteResponse(BaseModel):
+    message: str
+    user_id: int
