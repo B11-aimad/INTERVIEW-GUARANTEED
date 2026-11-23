@@ -30,6 +30,10 @@ if "auth_redirect_after" not in st.session_state:
     st.session_state.auth_redirect_after = "home"
 if "jwt_token" not in st.session_state:
     st.session_state.jwt_token = None
+if "profile_menu_open" not in st.session_state:
+    st.session_state.profile_menu_open = False
+if "dashboard_tab_hint" not in st.session_state:
+    st.session_state.dashboard_tab_hint = "account"
 if "agent_state" not in st.session_state:
     st.session_state.agent_state = "ACTIF"
 if "show_cv_text" not in st.session_state:
@@ -39,23 +43,112 @@ if "cv_payload" not in st.session_state:
 
 _ = check_health()
 
-# Redirection vers l'accueil ou l'authentification (Dashboard / Upload CV)
+# Actions via query params sans effacer jwt_token
 nav_param = st.query_params.get("go")
-if nav_param == "auth_upload":
-    st.session_state.auth_redirect_after = "home"
-    st.session_state.active_view = "auth" if not st.session_state.jwt_token else "home"
+if nav_param:
     st.query_params.clear()
-elif nav_param == "auth_dashboard":
-    st.session_state.auth_redirect_after = "dashboard"
-    st.session_state.active_view = "auth" if not st.session_state.jwt_token else "dashboard"
-    st.query_params.clear()
-elif nav_param == "home":
-    st.session_state.active_view = "home"
-    st.query_params.clear()
+    if nav_param == "home":
+        st.session_state.profile_menu_open = False
+        st.session_state.active_view = "home"
+    elif nav_param == "upload":
+        st.session_state.profile_menu_open = False
+        if st.session_state.jwt_token:
+            st.session_state.active_view = "home"
+        else:
+            st.session_state.auth_redirect_after = "home"
+            st.session_state.active_view = "auth"
+    elif nav_param == "dashboard":
+        st.session_state.profile_menu_open = False
+        st.session_state.dashboard_tab_hint = "account"
+        if st.session_state.jwt_token:
+            st.session_state.active_view = "dashboard"
+        else:
+            st.session_state.auth_redirect_after = "dashboard"
+            st.session_state.active_view = "auth"
+    elif nav_param == "toggle_profile_menu":
+        if st.session_state.jwt_token:
+            st.session_state.profile_menu_open = not st.session_state.profile_menu_open
+        else:
+            st.session_state.auth_redirect_after = "dashboard"
+            st.session_state.active_view = "auth"
+    elif nav_param == "view_profile":
+        st.session_state.profile_menu_open = False
+        st.session_state.dashboard_tab_hint = "profile"
+        if st.session_state.jwt_token:
+            st.session_state.active_view = "dashboard"
+        else:
+            st.session_state.auth_redirect_after = "dashboard"
+            st.session_state.active_view = "auth"
+    elif nav_param == "logout":
+        st.session_state.profile_menu_open = False
+        st.session_state.jwt_token = None
+        st.session_state.active_view = "auth"
 
-# Menu unique fixe en haut : logo à gauche, Home / Upload CV / À propos centrés + icônes, Dashboard bleu à droite
-st.markdown(
+is_logged_in = bool(st.session_state.jwt_token)
+
+right_actions_html = (
     """
+    <div class="eg-right-actions">
+        <a href="?go=dashboard" target="_self" class="eg-btn-dashboard-nav">
+            <svg class="eg-nav-icon" viewBox="0 0 24 24">
+                <rect x="3" y="3" width="7" height="9" rx="1"/>
+                <rect x="14" y="3" width="7" height="5" rx="1"/>
+                <rect x="14" y="12" width="7" height="9" rx="1"/>
+                <rect x="3" y="16" width="7" height="5" rx="1"/>
+            </svg>
+            <span>Dashboard</span>
+        </a>
+        <a href="?go=toggle_profile_menu" target="_self" class="eg-profile-icon-btn" title="Profil &amp; Session">
+            <svg class="eg-nav-icon" viewBox="0 0 24 24">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+            </svg>
+        </a>
+    </div>
+    """
+    if is_logged_in
+    else """
+    <div class="eg-right-actions">
+        <a href="?go=dashboard" target="_self" class="eg-btn-dashboard-nav">
+            <svg class="eg-nav-icon" viewBox="0 0 24 24">
+                <rect x="3" y="3" width="7" height="9" rx="1"/>
+                <rect x="14" y="3" width="7" height="5" rx="1"/>
+                <rect x="14" y="12" width="7" height="9" rx="1"/>
+                <rect x="3" y="16" width="7" height="5" rx="1"/>
+            </svg>
+            <span>Dashboard</span>
+        </a>
+    </div>
+    """
+)
+
+floating_bar_html = (
+    """
+    <div class="eg-floating-profile-bar">
+        <a href="?go=view_profile" target="_self" class="eg-floating-item profile">
+            <svg class="eg-nav-icon" viewBox="0 0 24 24">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+            </svg>
+            <span>Consulter profil</span>
+        </a>
+        <a href="?go=logout" target="_self" class="eg-floating-item logout">
+            <svg class="eg-nav-icon" viewBox="0 0 24 24">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            <span>Logout</span>
+        </a>
+    </div>
+    """
+    if (is_logged_in and st.session_state.profile_menu_open)
+    else ""
+)
+
+# Menu unique fixe en haut
+st.markdown(
+    f"""
     <div id="top"></div>
     <header class="eg-fixed-header">
         <a href="?go=home" target="_self" class="eg-logo">GARANT<span>.AI</span></a>
@@ -66,7 +159,7 @@ st.markdown(
                 </svg>
                 <span>Home</span>
             </a>
-            <a href="?go=auth_upload" target="_self" class="eg-nav-link">
+            <a href="?go=upload" target="_self" class="eg-nav-link">
                 <svg class="eg-nav-icon" viewBox="0 0 24 24">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                     <polyline points="17 8 12 3 7 8"/>
@@ -83,16 +176,9 @@ st.markdown(
                 <span>À propos</span>
             </a>
         </nav>
-        <a href="?go=auth_dashboard" target="_self" class="eg-btn-dashboard-nav">
-            <svg class="eg-nav-icon" viewBox="0 0 24 24">
-                <rect x="3" y="3" width="7" height="9" rx="1"/>
-                <rect x="14" y="3" width="7" height="5" rx="1"/>
-                <rect x="14" y="12" width="7" height="9" rx="1"/>
-                <rect x="3" y="16" width="7" height="5" rx="1"/>
-            </svg>
-            <span>Dashboard</span>
-        </a>
+        {right_actions_html}
     </header>
+    {floating_bar_html}
     <div class="eg-top-spacer"></div>
     """,
     unsafe_allow_html=True,
@@ -171,6 +257,7 @@ def render_auth_view():
                             ok, token, msg = login_user(email, password)
                             if ok and token:
                                 st.session_state.jwt_token = token
+                                st.session_state.profile_menu_open = False
                                 st.session_state.active_view = st.session_state.auth_redirect_after
                                 st.rerun()
                             else:
@@ -197,6 +284,7 @@ def render_auth_view():
                                 login_ok, token, login_msg = login_user(email, password)
                                 if login_ok and token:
                                     st.session_state.jwt_token = token
+                                    st.session_state.profile_menu_open = False
                                     st.session_state.active_view = st.session_state.auth_redirect_after
                                     st.rerun()
                                 else:
@@ -330,31 +418,31 @@ def render_dashboard_view():
     _, dash_col, _ = st.columns([1.2, 7.6, 1.2])
     with dash_col:
         with st.container(border=True):
-            tab_account, tab_profile = st.tabs(["Compte & Formule", "Profil Candidat"])
+            st.markdown(f"### {user_data['full_name']}")
+            st.write(f"**Email :** {user_data['email']}")
+            st.write(f"**État de l'agent :** {user_data['agent_status']}")
+            st.write(f"**Formule active :** {sub.get('plan', 'Découverte')}")
+            st.write(f"**Candidatures :** {sub.get('applications_used', 0)} / {sub.get('max_applications') or 'Illimité'}")
+            st.write(f"**Générations IA :** {sub.get('ai_generations_used', 0)} / {sub.get('max_ai_generations') or 'Illimité'}")
 
-            with tab_account:
-                st.markdown(f"### {user_data['full_name']}")
-                st.write(f"**Email :** {user_data['email']}")
-                st.write(f"**État de l'agent :** {user_data['agent_status']}")
-                st.write(f"**Formule active :** {sub.get('plan', 'Découverte')}")
-                st.write(f"**Candidatures :** {sub.get('applications_used', 0)} / {sub.get('max_applications') or 'Illimité'}")
-                st.write(f"**Générations IA :** {sub.get('ai_generations_used', 0)} / {sub.get('max_ai_generations') or 'Illimité'}")
-                if st.session_state.cv_payload:
-                    st.write(f"**Dernier CV préparé :** {st.session_state.cv_payload['filename']}")
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("Retour à l'accueil", use_container_width=True):
+                    st.session_state.active_view = "home"
+                    st.rerun()
+            with c2:
+                if st.button("Se déconnecter", use_container_width=True):
+                    st.session_state.jwt_token = None
+                    st.session_state.profile_menu_open = False
+                    st.session_state.active_view = "auth"
+                    st.rerun()
 
-                c1, c2 = st.columns(2)
-                with c1:
-                    if st.button("Retour à l'accueil", use_container_width=True):
-                        st.session_state.active_view = "home"
-                        st.rerun()
-                with c2:
-                    if st.button("Se déconnecter", use_container_width=True):
-                        st.session_state.jwt_token = None
-                        st.session_state.active_view = "auth"
-                        st.rerun()
+            st.divider()
+            st.markdown("### Profil Candidat")
+            render_profile_tab(token)
 
-                st.divider()
-                st.markdown("#### Modifier le compte")
+            st.divider()
+            with st.expander("Modifier le compte / Formule / Supprimer"):
                 with st.form("update_user_form"):
                     upd_name = st.text_input("Nom complet", value=user_data["full_name"])
                     upd_email = st.text_input("Adresse email", value=user_data["email"])
@@ -379,18 +467,15 @@ def render_dashboard_view():
                     else:
                         st.error(s_msg)
 
-                with st.expander("Supprimer mon compte"):
-                    if st.button("Confirmer la suppression définitive", use_container_width=True):
-                        d_ok, d_msg = delete_my_account(token)
-                        if d_ok:
-                            st.session_state.jwt_token = None
-                            st.session_state.active_view = "home"
-                            st.rerun()
-                        else:
-                            st.error(d_msg)
-
-            with tab_profile:
-                render_profile_tab(token)
+                if st.button("Confirmer la suppression définitive du compte", use_container_width=True):
+                    d_ok, d_msg = delete_my_account(token)
+                    if d_ok:
+                        st.session_state.jwt_token = None
+                        st.session_state.profile_menu_open = False
+                        st.session_state.active_view = "home"
+                        st.rerun()
+                    else:
+                        st.error(d_msg)
 
 
 def render_home_view():
@@ -398,8 +483,9 @@ def render_home_view():
 
     with main_col:
         with st.container(border=True):
+            cta_href = "?go=upload#upload-cv" if st.session_state.jwt_token else "?go=upload"
             st.markdown(
-                """
+                f"""
                 <div class="eg-hero-box">
                     <h1 class="eg-hero-title">
                         Optimisez votre CV pour un <span class="eg-hero-mark">matching exact</span>
@@ -409,7 +495,7 @@ def render_home_view():
                         génère des lettres fidèles à votre parcours et arrête automatiquement l'agent dès
                         l'obtention d'un entretien.
                     </p>
-                    <a href="?go=auth_upload" target="_self" class="eg-hero-cta">Importer mon CV</a>
+                    <a href="{cta_href}" target="_self" class="eg-hero-cta">Importer mon CV</a>
                 </div>
                 """,
                 unsafe_allow_html=True,
