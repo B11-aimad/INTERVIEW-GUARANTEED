@@ -40,7 +40,7 @@ section.main,
     margin-right: 0 !important;
 }
 
-/* Menu unique fixe en haut : logo à gauche, liens centrés */
+/* Menu unique fixe en haut : logo à gauche, liens centrés, bouton Dashboard bleu à droite */
 .eg-fixed-header {
     position: fixed;
     top: 0;
@@ -57,7 +57,7 @@ section.main,
 }
 
 .eg-top-spacer {
-    height: 50px;
+    height: 54px;
 }
 
 .eg-logo {
@@ -79,24 +79,55 @@ section.main,
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 24px;
+    gap: 22px;
     flex-wrap: wrap;
     font-size: 0.92rem;
     font-weight: 600;
 }
 
-.eg-menu-links a {
+.eg-nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     color: #0B192C !important;
     text-decoration: none !important;
     white-space: nowrap;
 }
 
-.eg-menu-links a:hover {
+.eg-nav-link:hover {
     color: #0A6ED1 !important;
 }
 
-.eg-header-spacer {
+.eg-nav-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.eg-btn-dashboard-nav {
     justify-self: end;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background-color: #0A6ED1;
+    color: #FFFFFF !important;
+    font-weight: 700;
+    font-size: 0.88rem;
+    padding: 7px 16px;
+    border-radius: 8px;
+    text-decoration: none !important;
+    white-space: nowrap;
+    border: 1px solid #0A6ED1;
+}
+
+.eg-btn-dashboard-nav:hover {
+    background-color: #0854A0;
+    border-color: #0854A0;
 }
 
 /* Section Hero centrée avec texte justifié */
@@ -150,11 +181,11 @@ section.main,
 
 .eg-center-heading {
     text-align: center;
-    font-size: 1.22rem;
+    font-size: 1.25rem;
     font-weight: 700;
     letter-spacing: -0.015em;
     color: #0B192C;
-    margin: 12px 0 8px 0;
+    margin: 14px 0 10px 0;
 }
 
 .eg-step-pill {
@@ -164,6 +195,134 @@ section.main,
     border-radius: 8px;
     padding: 8px 10px;
     margin-bottom: 10px;
+}
+
+/* Stepper moderne 1 -> 2 -> 3 */
+.eg-stepper {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    margin: 6px auto 18px auto;
+    max-width: 540px;
+}
+
+.eg-stepper-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 110px;
+}
+
+.eg-stepper-circle {
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-bottom: 6px;
+}
+
+.eg-stepper-circle.active {
+    background-color: #0A6ED1;
+    color: #FFFFFF;
+}
+
+.eg-stepper-circle.pending {
+    background-color: #F1F5F9;
+    color: #94A3B8;
+    border: 1.5px solid #CBD5E1;
+}
+
+.eg-stepper-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.eg-stepper-label.active {
+    color: #0B192C;
+}
+
+.eg-stepper-label.pending {
+    color: #94A3B8;
+}
+
+.eg-stepper-line {
+    flex: 1;
+    height: 1.5px;
+    background-color: #CBD5E1;
+    margin-top: 19px;
+    min-width: 48px;
+}
+
+/* Cadre pointillé bleu de dépôt CV */
+.eg-dropzone-card {
+    border: 1.5px dashed #3B82F6;
+    border-radius: 10px;
+    background-color: #FAFCFF;
+    padding: 20px 18px 14px 18px;
+    max-width: 720px;
+    margin: 0 auto 12px auto;
+    text-align: center;
+}
+
+.eg-dropzone-icon {
+    width: 44px;
+    height: 52px;
+    margin: 0 auto 8px auto;
+    border-radius: 6px;
+    background-color: #E0F2FE;
+    color: #0284C7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.45rem;
+    font-weight: 800;
+}
+
+.eg-dropzone-title {
+    font-size: 0.98rem;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 3px;
+}
+
+.eg-dropzone-title span {
+    color: #0A6ED1;
+    font-weight: 700;
+}
+
+.eg-dropzone-sub {
+    font-size: 0.8rem;
+    color: #64748B;
+    margin-bottom: 10px;
+}
+
+/* Bouton "Préparer / Analyser le CV" : fond bleu + texte blanc comme le bouton Dashboard */
+.eg-btn-primary-blue button,
+.eg-btn-primary-blue button *,
+.stButton > button[kind="primary"],
+.stButton > button[kind="primary"] *,
+button[data-testid="stBaseButton-primary"],
+button[data-testid="stBaseButton-primary"] * {
+    background-color: #0A6ED1 !important;
+    color: #FFFFFF !important;
+    border: 1px solid #0A6ED1 !important;
+    border-radius: 8px !important;
+    font-weight: 700 !important;
+}
+
+.eg-btn-primary-blue button:hover,
+.eg-btn-primary-blue button:hover *,
+.stButton > button[kind="primary"]:hover,
+.stButton > button[kind="primary"]:hover *,
+button[data-testid="stBaseButton-primary"]:hover,
+button[data-testid="stBaseButton-primary"]:hover * {
+    background-color: #0854A0 !important;
+    color: #FFFFFF !important;
+    border-color: #0854A0 !important;
 }
 
 [data-testid="stVerticalBlockBorderWrapper"] p,
@@ -180,14 +339,13 @@ section.main,
     color: #475569;
 }
 
-
 @media (max-width: 768px) {
     .eg-fixed-header {
         display: flex;
         justify-content: space-between;
         padding: 10px 14px;
     }
-    .eg-header-spacer {
-        display: none;
+    .eg-stepper-line {
+        min-width: 20px;
     }
 }
