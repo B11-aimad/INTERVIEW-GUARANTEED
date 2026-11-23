@@ -3,6 +3,8 @@ import enum
 from datetime import datetime, timezone
 from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
+from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy.orm import relationship
 
 from app.database import Base
 
@@ -43,6 +45,9 @@ class User(Base):
     consent = relationship("Consent", back_populates="user", uselist=False, cascade="all, delete-orphan")
     subscription = relationship(
         "Subscription", back_populates="user", uselist=False, cascade="all, delete-orphan"
+    )
+    profile = relationship(
+        "CandidateProfile", back_populates="user", uselist=False, cascade="all, delete-orphan"
     )
 
 
